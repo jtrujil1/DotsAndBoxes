@@ -6,12 +6,12 @@ import Data.Maybe
 import Debug.Trace
 
 --Data Types--
-type Board = [Line] deriving Show
-type Line = (Dot, Dot) deriving Show
-data Dots = (Int, Int)
-type Box = Dot deriving Show
-data Player = Player1 | Player2
-data PlayerScores = (P1 (Player, Int, [Box]), P2 (Player, Int, [Box])) deriving Show
+type Board = [Line] 
+type Line = (Dot, Dot)
+type Dot = (Int, Int)
+type Box = Dot 
+data Player = Player1 | Player2 deriving Show
+data PlayerScores = ([Box],[Box]) deriving Show
 
 --Possible Functions
 --createBoard
@@ -47,6 +47,7 @@ remove :: Eq a => a -> [a] -> [a]
 remove = undefined
 
 --checks to see if line is valid
+--error if not valid
 validLine :: Dot -> Dot -> Bool
 validLine = undefined
 
