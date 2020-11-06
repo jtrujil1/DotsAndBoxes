@@ -11,7 +11,7 @@ type Line = (Dot, Dot)
 type Dot = (Int, Int)
 type Box = Dot 
 data Player = Player1 | Player2 deriving Show
-data PlayerScores = ([Box],[Box]) deriving Show
+type PlayerScores = ([Box],[Box])
 
 --Possible Functions
 --createBoard
@@ -35,12 +35,12 @@ updateBoard :: [Line] -> Board
 updateBoard = undefined
 
 --stores list of possible dots to be made
-allDots :: [Dot]
-allDots dots = [(x,y)| x <- [0..5], y <- [0..5]]
+--allDots :: [Dot]
+allDots = [(x,y)| x <- [0..5], y <- [0..5]]
 
 --lists of current lines on board after each move
-currentLines :: [Line]
-curentLines = undefined
+--currentLines :: [Line]
+--curentLines = undefined
 
 --remove dots/lines from lists
 remove :: Eq a => a -> [a] -> [a]
@@ -63,10 +63,15 @@ playerWin = undefined
 updateScore :: Player -> Box -> PlayerScores
 updateScore = undefined
 
+--turn input into dots for lines
+stringTurn :: String -> String -> Maybe Line 
+stringTurn = undefined 
+
 --check if line is valid
 --check if new box is formed
 --update the board
 --give back the player who's next
+--maybe ? give back tuple with player and score
 makePlay :: Player -> Line -> Player
 makePlay = undefined
 
