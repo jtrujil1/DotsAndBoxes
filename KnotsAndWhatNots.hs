@@ -14,7 +14,8 @@ data Player = Player1 | Player2 deriving (Show, Eq, Ord)
 type PlayerScores = ([Box],[Box])
 data GameState = Ongoing | GameOver deriving (Show, Eq, Ord)
 type Board = ([Line], PlayerScores, Player, GameState)
- 
+
+size = 3
 --Possible Functions
 --createBoard
 --updateBoard
@@ -40,10 +41,9 @@ updateBoard = undefined
 
 --stores list of possible dots to be made
 --allDots :: [Dot]
-allDots = [(x,y)| x <- [0..5], y <- [0..5]]
+allDots = [(x,y)| x <- [0..size], y <- [0..size]]
 
-size = 5
-
+allBoxes = [(x,y)| x <- [1..size -1], y <- [0..size-2]]
 
 --lists of current lines on board after each move
 --currentLines :: [Line]
@@ -51,7 +51,8 @@ size = 5
 
 --remove dots/lines from lists
 remove :: Eq a => a -> [a] -> [a]
-remove = undefined
+remove _ [] = []
+remove line (x:xs) =  
 
 --checks to see if line is valid
 --
@@ -89,12 +90,17 @@ stringTurn = undefined
 --give back the player who's next
 --maybe ? give back tuple with player and score
 makeMove :: Board -> Move -> Maybe Board
-makeMove (board, scores, player,state) move =
-  if state == GameOver then Nothing
+makeMove (board, scores, player,state) line =
+  if state == GameOver then Nothing else
+  let valid = validLine line
+      newBoard = remove line board
+      newBoxes = checkBox?
+      newPlayer = if player == Player1 then Player2 else Player1
+  in if valid then Just updateBoard (newBoard, newBoxes, newPlayer, state) else Nothing 
 
 --create a string that show the current state of the game
-prettyShow :: Board -> String
-prettyShow = undefined
+--prettyShow :: Board -> String
+--prettyShow = undefined
 
 {-
 maybe have a matrix of values??
