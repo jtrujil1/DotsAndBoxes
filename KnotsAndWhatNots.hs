@@ -7,12 +7,13 @@ import Debug.Trace
 
 --Data Types--
 type Dot = (Int, Int)
-type Line = (Dot, Dot)
+type Line = (Dot, Dot)--((1,1),(4,5))
 type Box = Dot
 type Move = Line 
 data Player = Player1 | Player2 deriving (Show, Eq, Ord)
 type PlayerScores = ([Box],[Box])
-type Board = ([Line], PlayerScores, Player)
+data GameState = Ongoing | GameOver deriving (Show, Eq, Ord)
+type Board = ([Line], PlayerScores, Player, GameState)
  
 --Possible Functions
 --createBoard
@@ -24,10 +25,12 @@ type Board = ([Line], PlayerScores, Player)
 --
 
 --check if board is full
-checkBoard :: Bool
+--check amount of boxes made
+checkBoard :: GameState
 checkBoard = undefined 
 
 --creates original board at start //start with 5 x 5
+--create orignal lines left on board
 createBoard :: Board
 createBoard = undefined
 
@@ -39,6 +42,9 @@ updateBoard = undefined
 --allDots :: [Dot]
 allDots = [(x,y)| x <- [0..5], y <- [0..5]]
 
+size = 5
+
+
 --lists of current lines on board after each move
 --currentLines :: [Line]
 --curentLines = undefined
@@ -48,7 +54,7 @@ remove :: Eq a => a -> [a] -> [a]
 remove = undefined
 
 --checks to see if line is valid
---error if not valid
+--
 validLine :: Line -> Bool
 validLine = undefined
 
@@ -58,13 +64,15 @@ validBox = undefined
 
 --depends if our board is holding the moves done or moves left
 validMoves :: Board -> [Move]
-validMoves = undefined
+validMoves (board, _,_,_) = board
 
 --checks highest number of box to declare winner
-winner :: Board -> Player
-winner (_, (boxes1, boxes2), _) =
+--check with Fogarty
+winner :: Board -> Board
+winner (board, (boxes1, boxes2), _,_) =
    let scores = [(length boxes1, Player1), (length boxes2, Player2)]
-   in snd $ maximum scores
+       champ = snd $ maximum scores
+   in (board,(boxes1, boxes2),champ,GameOver)
 
 --takes in a box and updates the player scores
 updateScore :: Player -> Box -> PlayerScores
@@ -75,12 +83,14 @@ stringTurn :: String -> String -> Maybe Line
 stringTurn = undefined 
 
 --check if line is valid
+--rm for list in board
 --check if new box is formed
 --update the board
 --give back the player who's next
 --maybe ? give back tuple with player and score
-makePlay :: Player -> Line -> Player
-makePlay = undefined
+makeMove :: Board -> Move -> Maybe Board
+makeMove (board, scores, player,state) move =
+  if state == GameOver then Nothing
 
 --create a string that show the current state of the game
 prettyShow :: Board -> String
