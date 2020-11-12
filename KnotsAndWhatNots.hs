@@ -6,13 +6,14 @@ import Data.Maybe
 import Debug.Trace
 
 --Data Types--
-type Board = [Line] 
-type Line = (Dot, Dot)
 type Dot = (Int, Int)
-type Box = Dot 
-data Player = Player1 | Player2 deriving Show
+type Line = (Dot, Dot)
+type Box = Dot
+type Move = Line 
+data Player = Player1 | Player2 deriving (Show, Eq, Ord)
 type PlayerScores = ([Box],[Box])
-
+type Board = ([Line], PlayerScores, Player)
+ 
 --Possible Functions
 --createBoard
 --updateBoard
@@ -31,7 +32,7 @@ createBoard :: Board
 createBoard = undefined
 
 --Update board after each move[line] is made
-updateBoard :: [Line] -> Board
+updateBoard :: Board -> Move -> Board
 updateBoard = undefined
 
 --stores list of possible dots to be made
@@ -48,16 +49,22 @@ remove = undefined
 
 --checks to see if line is valid
 --error if not valid
-validLine :: Dot -> Dot -> Bool
+validLine :: Line -> Bool
 validLine = undefined
 
 --checks to see if box has been made already
-validBox :: Box -> Bool
+validBox:: Box -> Bool
 validBox = undefined
 
+--depends if our board is holding the moves done or moves left
+validMoves :: Board -> [Move]
+validMoves = undefined
+
 --checks highest number of box to declare winner
-playerWin :: PlayerScores -> Player
-playerWin = undefined
+winner :: Board -> Player
+winner (_, (boxes1, boxes2), _) =
+   let scores = [(length boxes1, Player1), (length boxes2, Player2)]
+   in snd $ maximum scores
 
 --takes in a box and updates the player scores
 updateScore :: Player -> Box -> PlayerScores
@@ -75,4 +82,13 @@ stringTurn = undefined
 makePlay :: Player -> Line -> Player
 makePlay = undefined
 
+--create a string that show the current state of the game
+prettyShow :: Board -> String
+prettyShow = undefined
+
+{-
+maybe have a matrix of values??
+str = "Scores\nPlayer1: " ++ show (length boxes1) ++ "\tPlayer2: " ++ show (length boxes2) ++ "\n"
+boardStr = "*-------*" -- 7 are one tab
+-}
 
