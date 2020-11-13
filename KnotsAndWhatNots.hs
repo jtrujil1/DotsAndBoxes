@@ -24,7 +24,7 @@ type Board = ([Line], PlayerScores, Player, GameState)
 --ValidDot
 --remove (remove dots/lines that have already been played)
 
-size = 5
+size = 3
 
 allDots = [(x,y)| x <- [0..size-1], y <- [0..size-1]]
 
@@ -75,7 +75,7 @@ validLine line board = line `elem` boar
 
 --checks to see if box is valid
 validBox:: Box -> PlayerScores -> Bool
-validBox box (p1, p2) = (box `elem` allBoxes) && not $ box `elem` (p1++p2) 
+validBox box (p1, p2) = (box `elem` allBoxes) && not (box `elem` (p1++p2))
 
 --depends if our board is holding the moves done or moves left
 validMoves :: Board -> [Move]
@@ -87,20 +87,20 @@ validMoves (board, _,_,_) = board
 --update the board
 --give back the player who's next
 --maybe ? give back tuple with player and score
-
+{-
 makeMove :: Board -> Move -> Maybe Board
 makeMove (board, scores, player,state) line =
     let valid = line `elem` validMoves (board, scores, player,state)
         newBoard = remove line board
-        newBox = checkNewBox line scores
+        newBoxes = checkNewBox line scores
         newPlayer = if player == Player1 then Player2 else Player1
     in if valid then Just updateBoard (newBoard, newBoxes, newPlayer, state) else Nothing
-
+-}
 --return bool or??
-checkNewBox ((x1,y1), (x2,y2)) scores = 
-    let boxes = if horizontal ((x1,y1), (x2,y2)) then filter (\x -> validBox x scores) [(x1,y1),(x1,y1-1)] else filter (\x -> validBox x scores) [(x1,y1),(x1-1,y1)]
-       bLines = 
-    in 
+checkNewBox ((x1,y1), (x2,y2)) scores = if horizontal ((x1,y1), (x2,y2))
+                                                then filter (\x -> validBox x scores) [(x1,y1),(x1,y1-1)]
+                                                else filter (\x -> validBox x scores) [(x1,y1),(x1-1,y1)]
+
 
 horizontal ((x1,y1), (x2,y2)) = y1 == y2
 
@@ -123,9 +123,8 @@ winner (board, (boxes1, boxes2), _,_) =
 --prettyShow :: Board -> String
 --prettyShow = undefined
 
-{-
-maybe have a matrix of values??
+--maybe have a matrix of values??
 str = "Scores\nPlayer1: " ++ show (length boxes1) ++ "\tPlayer2: " ++ show (length boxes2) ++ "\n"
 boardStr = "*-------*" -- 7 are one tab
--}
+
 
