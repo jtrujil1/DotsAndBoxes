@@ -54,26 +54,14 @@ createBoard size =
     let lines = allLines size
     in (size, lines, ([],[]), Player1)
 
---Update board after each move is made
---check amount of boxes made
-updateBoard :: Board -> Move -> Board
-updateBoard = undefined
-
 --check if board is full
-checkBoard :: GameState
-checkBoard = undefined 
+checkBoard :: Board -> GameState
+checkBoard (_, board, _, _) = if null board then GameOver else Ongoing
 
---remove dots/lines from lists
-remove :: Eq a => a -> [a] -> [a]
-remove _ [] = []
-remove line (x:xs) = if x == line then xs else [x] ++ remove line xs
-
---checks to see if line is valid
--- maybe it's redundant cause we already have validMoves
-{-
-validLine :: Line -> [Line] -> Bool
-validLine line board = line `elem` boar
--}
+--remove line from board
+updateBoard :: Eq a => a -> [a] -> [a]
+updateBoard _ [] = []
+updateBoard line (x:xs) = if x == line then xs else [x] ++ remove line xs
 
 --checks to see if box is valid
 validBox:: Int -> Box -> PlayerScores -> Bool
@@ -89,26 +77,19 @@ validMoves (_, lines, _,_) = lines
 --update the board
 --give back the player who's next
 --maybe ? give back tuple with player and score
-{-
 makeMove :: Board -> Move -> Maybe Board
-makeMove (size, board, scores, player,state) line =
-    let valid = line `elem` validMoves (size, board, scores, player,state)
-        newBoard = remove line board
-        newBoxes = checkNewBox size line scores
-        newPlayer = if player == Player1 then Player2 else Player1
-    in if valid then Just updateBoard (newBoard, newBoxes, newPlayer, state) else Nothing
--}
---return bool or??
-checkNewBox size ((x1,y1), (x2,y2)) scores = if horizontal ((x1,y1), (x2,y2))
+makeMove (size, board, scores, player) line =
+    let valid = line `elem` validMoves (size, board, scores, player)
+        newBoard = updateBoard line board
+        boxes = newBoxes size line scores
+        newPlayer = if null boxes then if player == Player1 then Player2 else Player1 else player
+    in if valid then Just (size, newBoard, boxes, newPlayer) else Nothing
+
+newBoxes :: Int -> Move -> PlayerScores -> [Box]
+newBoxes size ((x1,y1), (x2,y2)) scores = if horizontal ((x1,y1), (x2,y2))
                                                 then filter (\x -> validBox size x scores) [(x1,y1),(x1,y1-1)]
                                                 else filter (\x -> validBox size x scores) [(x1,y1),(x1-1,y1)]
-
-
 horizontal ((x1,y1), (x2,y2)) = y1 == y2
-
---takes in a box and updates the player scores
-updateScore :: Player -> Box -> PlayerScores
-updateScore = undefined
 
 --checks highest number of box to declare winner
 --check with Fogarty
@@ -122,11 +103,11 @@ winner (size, board, (boxes1, boxes2), _) =
               then Nothing-}
 
 --create a string that show the current state of the game
---prettyShow :: Board -> String
---prettyShow = undefined
-{-
+prettyShow :: Board -> String
+prettyShow = undefined
+
 --maybe have a matrix of values??
 str = "Scores\nPlayer1: " ++ show (length boxes1) ++ "\tPlayer2: " ++ show (length boxes2) ++ "\n"
-boardStr = "*-------*" -- 7 are one tab-}
+boardStr = "*-------*" -- 7 are one tab
 
 
