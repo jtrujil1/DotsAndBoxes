@@ -2,6 +2,7 @@
 import Data.Tuple (swap)
 import Data.List
 import Data.List.Split
+--import Data.List (nub)
 import Data.Maybe
 import Debug.Trace
 
@@ -12,7 +13,8 @@ type Box = Dot
 type Move = Line 
 data Player = Player1 | Player2 deriving (Show, Eq, Ord)
 type PlayerScores = ([Box],[Box])
-data GameState = Ongoing | GameOver deriving (Show, Eq, Ord)
+data Outcome = Winner Player | Tie deriving (Show, Eq, Ord)
+data GameState = Ongoing | GameOver Outcome deriving (Show, Eq, Ord)
 type Board = (Int, [Line], PlayerScores, Player)
 
 
@@ -24,24 +26,11 @@ type Board = (Int, [Line], PlayerScores, Player)
 --ValidDot
 --remove (remove dots/lines that have already been played)
 
---size = 3
-
 allDots size = [(x,y)| x <- [0..size-1], y <- [0..size-1]]
 
 allBoxes size = [(x,y)| x <- [0..size-2], y <- [0..size-2]]
 
---lineMaker [] = []
---lineMaker ((a,b):xs) = [((a,b), (c,d)) | (c,d) <- xs, ((a+b) - (c+d))^2 == 1, (dist (a,b) (c,d)) == 1] ++ lineMaker xs
-
 allLines size = [((a,b),(a+1,b)) | a <- [0..size-1], b <- [0..size-1], not (a+1 == size)] ++ [((a,b), (a,b+1)) | a <- [0..size-1], b <- [0..size-1], not (b+1 == size)]
-
---dist (x1, y1) (x2, y2) =  ceiling $ sqrt $ (fromIntegral x1 - fromIntegral x2)^2 + (fromIntegral y1 - fromIntegral y2)^2
-
---Box [((x,y)(x+1, y)),((x,y)(x, y+1)), ((x+1,y)(x+1, y+1)), ((x,y+1)(x+1, y+1))]
-
---lists of current lines on board after each move
---currentLines :: [Line]
---curentLines = undefined
 
 --turn input into dots for lines
 readStr :: String -> String -> Maybe Line 
@@ -61,11 +50,11 @@ checkBoard (_, board, _, _) = if null board then GameOver else Ongoing
 --remove line from board
 updateBoard :: Eq a => a -> [a] -> [a]
 updateBoard _ [] = []
-updateBoard line (x:xs) = if x == line then xs else [x] ++ remove line xs
+updateBoard line (x:xs) = if x == line then xs else [x] ++ updateBoard line xs
 
 --checks to see if box is valid
-validBox:: Int -> Box -> PlayerScores -> Bool
-validBox size box (p1, p2) = (box `elem` (allBoxes size)) && not (box `elem` (p1++p2))
+validBox:: Int -> PlayerScores -> Box -> Bool
+validBox size (p1, p2) (x,y) = (x >= 0 && x < size-1) && (y >= 0 && y < size-1) && (box `notElem` (p1++p2))
 
 --depends if our board is holding the moves done or moves left
 validMoves :: Board -> [Move]
@@ -78,22 +67,35 @@ validMoves (_, lines, _,_) = lines
 --give back the player who's next
 --maybe ? give back tuple with player and score
 makeMove :: Board -> Move -> Maybe Board
-makeMove (size, board, scores, player) line =
-    let valid = line `elem` validMoves (size, board, scores, player)
+makeMove game@(size, board, scores, player) line =
+    let valid = line `elem` board
         newBoard = updateBoard line board
-        boxes = newBoxes size line scores
-        newPlayer = if null boxes then if player == Player1 then Player2 else Player1 else player
-    in if valid then Just (size, newBoard, boxes, newPlayer) else Nothing
+        boxes = validNewBoxes (size, newBoard, scores, player) line
+    in if valid then Just (updateScores (size, newBoard, scores, player) boxes) else Nothing
 
-newBoxes :: Int -> Move -> PlayerScores -> [Box]
-newBoxes size ((x1,y1), (x2,y2)) scores = if horizontal ((x1,y1), (x2,y2))
-                                                then filter (\x -> validBox size x scores) [(x1,y1),(x1,y1-1)]
-                                                else filter (\x -> validBox size x scores) [(x1,y1),(x1-1,y1)]
-horizontal ((x1,y1), (x2,y2)) = y1 == y2
+validNewBoxes :: Board -> Move -> [Box]
+validNewBoxes (size, board, scores, player) ((x1,y1), (x2,y2)) =
+     let possibleBoxes = if horizontal ((x1,y1), (x2,y2))
+                            then filter (validBox size scores) [(x1,y1),(x1,y1-1)]
+                            else filter (validBox size scores) [(x1,y1),(x1-1,y1)]
+         played ln = (ln `notElem` board) 
+         playedBox (l1, l2, l3, l4) = played l1 && played l2 && played l3 && played l4
+         horizontal ((x1,y1), (x2,y2)) = y1 == y2
+     in  [box | box <- possibleBoxes, playedBox (linesOfBox box)]
+
+linesOfBox :: Box -> (Line, Line, Line, Line)
+linesOfBox (x,y) = (((x,y),(x+1,y)),((x,y), (x, y+1)),((x+1,y), (x+1,y+1)),((x,y+1),(x+1,y+1)))
+
+updateScores :: Board -> [Box] -> Board
+updateScores (size, board, (p1, p2), player) boxes =
+    let noBoxes = null boxes
+    in case player of
+            Player1 -> if noBoxes then (size, board, (p1, p2), Player2) else (size, board, (p1++boxes, p2), Player1)
+            Player2 -> if noBoxes then (size, board, (p1, p2), Player1) else (size, board, (p1, p2++boxes), Player2)
 
 --checks highest number of box to declare winner
 --check with Fogarty
-winner :: Board -> Board
+winner :: Board -> GameState
 winner (size, board, (boxes1, boxes2), _) =
    let scores = [(length boxes1, Player1), (length boxes2, Player2)]
        champ = snd $ maximum scores
@@ -105,9 +107,10 @@ winner (size, board, (boxes1, boxes2), _) =
 --create a string that show the current state of the game
 prettyShow :: Board -> String
 prettyShow = undefined
-
+{-
+putStrLn $ prettyShow
 --maybe have a matrix of values??
 str = "Scores\nPlayer1: " ++ show (length boxes1) ++ "\tPlayer2: " ++ show (length boxes2) ++ "\n"
-boardStr = "*-------*" -- 7 are one tab
+boardStr = "*-------*" -- 7 are one tab-}
 
 
