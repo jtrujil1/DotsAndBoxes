@@ -2,13 +2,12 @@
 import Data.Tuple (swap)
 import Data.List
 import Data.List.Split
---import Data.List (nub)
 import Data.Maybe
 import Debug.Trace
 
 --Data Types--
 type Dot = (Int, Int)
-type Line = (Dot, Dot)--((1,1),(4,5))
+type Line = (Dot, Dot)
 type Box = Dot
 type Move = Line 
 data Player = Player1 | Player2 deriving (Show, Eq, Ord)
@@ -16,15 +15,6 @@ type PlayerScores = ([Box],[Box])
 data Outcome = Winner Player | Tie deriving (Show, Eq, Ord)
 data GameState = Ongoing | GameOver Outcome deriving (Show, Eq, Ord)
 type Board = (Int, [Line], PlayerScores, Player)
-
-
---Possible Functions
---createBoard
---updateBoard
---AllDots
---ValidBox
---ValidDot
---remove (remove dots/lines that have already been played)
 
 allDots size = [(x,y)| x <- [0..size-1], y <- [0..size-1]]
 
@@ -37,11 +27,10 @@ readStr :: String -> String -> Maybe Line
 readStr = undefined 
 
 --creates original board at the beginning
---create orignal lines left on board
 createBoard :: Int -> Board
 createBoard size =
-    let lines = allLines size
-    in (size, lines, ([],[]), Player1)
+   let lines = allLines size
+   in (size, lines, ([],[]), Player1)
 
 --check if board is full
 checkBoard :: Board -> GameState
@@ -60,27 +49,21 @@ validBox size (p1, p2) (x,y) = (x >= 0 && x < size-1) && (y >= 0 && y < size-1) 
 validMoves :: Board -> [Move]
 validMoves (_, lines, _,_) = lines
 
---check if line is valid
---rm for list in board
---check if new box is formed
---update the board
---give back the player who's next
---maybe ? give back tuple with player and score
 makeMove :: Board -> Move -> Maybe Board
 makeMove game@(size, board, scores, player) line =
-    let valid = line `elem` board
-        newBoard = updateBoard line board
-        boxes = validNewBoxes (size, newBoard, scores, player) line
-    in if valid then Just (updateScores (size, newBoard, scores, player) boxes) else Nothing
+   let valid = line `elem` board
+       newBoard = updateBoard line board
+       boxes = validNewBoxes (size, newBoard, scores, player) line
+   in if valid then Just (updateScores (size, newBoard, scores, player) boxes) else Nothing
 
 validNewBoxes :: Board -> Move -> [Box]
 validNewBoxes (size, board, scores, player) ((x1,y1), (x2,y2)) =
-     let possibleBoxes = if horizontal ((x1,y1), (x2,y2))
+   let possibleBoxes = if horizontal ((x1,y1), (x2,y2))
                             then filter (validBox size scores) [(x1,y1),(x1,y1-1)]
                             else filter (validBox size scores) [(x1,y1),(x1-1,y1)]
-         played ln = (ln `notElem` board) 
-         playedBox (l1, l2, l3, l4) = played l1 && played l2 && played l3 && played l4
-     in  [box | box <- possibleBoxes, playedBox (linesOfBox box)]
+       played ln = (ln `notElem` board) 
+       playedBox (l1, l2, l3, l4) = played l1 && played l2 && played l3 && played l4
+   in  [box | box <- possibleBoxes, playedBox (linesOfBox box)]
 
 linesOfBox :: Box -> (Line, Line, Line, Line)
 linesOfBox (x,y) = (((x,y),(x+1,y)),((x,y), (x, y+1)),((x+1,y), (x+1,y+1)),((x,y+1),(x+1,y+1)))
@@ -95,46 +78,44 @@ updateScores (size, board, (p1, p2), player) boxes =
             Player2 -> if noBoxes then (size, board, (p1, p2), Player1) else (size, board, (p1, p2++boxes), Player2)
 
 --checks highest number of box to declare winner
---check with Fogarty
-
 winner :: Board -> Outcome
 winner (size, board, (boxes1, boxes2), _) =
    let scores@[(score1, p1), (score2, p2)] = [(length boxes1, Player1), (length boxes2, Player2)]
        champ = snd $ maximum scores
    in if score1 == score2 then Tie else Winner champ
 
-{-  if state == GameOver
-              then Nothing-}
-
 --create a string that show the current state of the game
---[((0,0),(1,0)),((0,1),(1,1)),((0,2),(1,2)),((1,0),(2,0)),((1,1),(2,1)),((1,2),(2,2)),((0,0),(0,1)),((0,1),(0,2)),((1,0),(1,1)),((1,1),(1,2)),((2,0),(2,1)),((2,1),(2,2))]
---((a,b),(c,d))
 prettyShow :: Board -> String
-prettyShow (size, board, (box1, box2), player) = 
-  let horz =  [line | line <- allLines size, horizontal line]
-      vertz = [line | line <- allLines size, not (horizontal line)] 
-      played = filter (\x -> x `notElem` board) (allLines size)
-      str = "Scores\nPlayer1: " ++ show (length box1) ++ "\tPlayer2: " ++ show (length box2) ++ "\n"
-      border = "==============="
-      lineStr [] = []
-      lineStr (x:xs) = (lineToString x played size) ++ lineStr xs
-  in border ++ str ++ border -- + lineStr lines
---((x,y),(a,b))
-lineToString :: Line -> [Line] -> Int -> String
-lineToString line@((_,_), (x,y)) played size =
-  let horLineStr = if line `elem` played then "---" else "   "
-      vertLineStr = if line `elem` played then "|  " else "   "
-      endOfHorLine = if y == size-1 then "*\n" else ""
-      endOfVertLine = if y == size-1 then "\n" else ""
-  in if horizontal line
-        then "*" ++ horLineStr ++ endOfHorLine
-        else vertLineStr ++ endOfVertLine
+prettyShow game@(size, board, (p1, p2), player) = 
+   let played = filter (\x -> x `notElem` board) (allLines size)
+       boardStr = concat [rowStr num played game | num <- [0..size-1]]
+       scoresStr = "Scores\nPlayer1: " ++ show (length p1) ++ "\tPlayer2: " ++ show (length p2) ++ "\n"
+       border = "===============\n"
+   in border ++ scoresStr ++ border ++ boardStr ++ border
+
+rowStr num played (size, _, (p1, p2), _) =
+    let hor = [((x1, y1), (x2, y2)) | ((x1, y1), (x2, y2)) <- allLines size, y1 == num, horizontal ((x1, y1), (x2, y2))] 
+        ver = [((x1, y1), (x2, y2)) | ((x1, y1), (x2, y2)) <- allLines size, y1 == num, not (horizontal ((x1, y1), (x2, y2)))]
+    in  (horStr hor played size) ++ "*\n" ++ (verStr ver played size (p1, p2)) ++ "\n"
+
+horStr [] _ _ = []
+horStr (x:xs) played size = (horizontalLine x played size) ++ horStr xs played size
+
+verStr [] _ _ _ = []
+verStr (x:xs) played size (p1, p2) = (verticalLine x played size (p1,p2)) ++ verStr xs played size (p1, p2)
+
+horizontalLine line@((_,_), (x,y)) played size = if line `elem` played then "*---" else "*   "
+
+
+verticalLine line@((x1, y1), (x2,y2)) played size (p1, p2) =
+   let str = if line `elem` played then "|" else " "
+       num
+          | (x1, y1) `elem` p1 = " 1 "
+          | (x1, y1) `elem` p2 = " 2 "
+          | otherwise = "   "
+   in str ++ num
 
 {-
-putStrLn $ prettyShow
---maybe have a matrix of values??
-str = "Scores\nPlayer1: " ++ show (length boxes1) ++ "\tPlayer2: " ++ show (length boxes2) ++ "\n"
-boardStr = "*-------*" -- 7 are one tab
 Player: Player1
 Score : 5
 ===================
@@ -148,8 +129,3 @@ Score : 5
 ===================
 
 --}
-
-
-
-
-
