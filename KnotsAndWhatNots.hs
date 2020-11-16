@@ -106,7 +106,6 @@ verStr (x:xs) played size (p1, p2) = (verticalLine x played size (p1,p2)) ++ ver
 
 horizontalLine line@((_,_), (x,y)) played size = if line `elem` played then "*---" else "*   "
 
-
 verticalLine line@((x1, y1), (x2,y2)) played size (p1, p2) =
    let str = if line `elem` played then "|" else " "
        num
