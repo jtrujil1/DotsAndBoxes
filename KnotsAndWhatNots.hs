@@ -7,7 +7,7 @@ import Debug.Trace
 
 --Data Types--
 type Dot = (Int, Int)
-type Line = (Dot, Dot)
+type Line = (Dot, Bool) -- True means it is horizontal
 type Box = Dot
 type Move = Line 
 data Player = Player1 | Player2 deriving (Show, Eq, Ord)
@@ -20,7 +20,7 @@ allDots size = [(x,y)| x <- [0..size-1], y <- [0..size-1]]
 
 allBoxes size = [(x,y)| x <- [0..size-2], y <- [0..size-2]]
 
-allLines size = [((a,b),(a+1,b)) | a <- [0..size-1], b <- [0..size-1], not (a+1 == size)] ++ [((a,b), (a,b+1)) | a <- [0..size-1], b <- [0..size-1], not (b+1 == size)]
+allLines size = [((x,y), True) | x <- [0..size-2], y <- [0..size-1]] ++ [((x,y), False) | x <- [0..size-1], y <- [0..size-2]]
 
 --turn input into dots for lines
 readStr :: String -> String -> Maybe Line 
@@ -57,18 +57,16 @@ makeMove game@(size, board, scores, player) line =
    in if valid then Just (updateScores (size, newBoard, scores, player) boxes) else Nothing
 
 validNewBoxes :: Board -> Move -> [Box]
-validNewBoxes (size, board, scores, player) ((x1,y1), (x2,y2)) =
-   let possibleBoxes = if horizontal ((x1,y1), (x2,y2))
-                            then filter (validBox size scores) [(x1,y1),(x1,y1-1)]
-                            else filter (validBox size scores) [(x1,y1),(x1-1,y1)]
+validNewBoxes (size, board, scores, player) ((x,y), dir) =
+   let possibleBoxes = if dir
+                            then filter (validBox size scores) [(x,y),(x,y-1)]
+                            else filter (validBox size scores) [(x,y),(x-1,y)]
        played ln = (ln `notElem` board) 
        playedBox (l1, l2, l3, l4) = played l1 && played l2 && played l3 && played l4
    in  [box | box <- possibleBoxes, playedBox (linesOfBox box)]
 
 linesOfBox :: Box -> (Line, Line, Line, Line)
-linesOfBox (x,y) = (((x,y),(x+1,y)),((x,y), (x, y+1)),((x+1,y), (x+1,y+1)),((x,y+1),(x+1,y+1)))
-
-horizontal ((x1,y1), (x2,y2)) = y1 == y2
+linesOfBox (x,y) = (((x,y), True),((x,y), False),((x,y+1), True),((x+1,y), False))
 
 updateScores :: Board -> [Box] -> Board
 updateScores (size, board, (p1, p2), player) boxes =
@@ -78,6 +76,7 @@ updateScores (size, board, (p1, p2), player) boxes =
             Player2 -> if noBoxes then (size, board, (p1, p2), Player1) else (size, board, (p1, p2++boxes), Player2)
 
 --checks highest number of box to declare winner
+--maybe it should return a Maybe outcome???????
 winner :: Board -> Outcome
 winner (size, board, (boxes1, boxes2), _) =
    let scores@[(score1, p1), (score2, p2)] = [(length boxes1, Player1), (length boxes2, Player2)]
@@ -94,25 +93,76 @@ prettyShow game@(size, board, (p1, p2), player) =
    in border ++ scoresStr ++ border ++ boardStr ++ border
 
 rowStr num played (size, _, (p1, p2), _) =
-    let hor = [((x1, y1), (x2, y2)) | ((x1, y1), (x2, y2)) <- allLines size, y1 == num, horizontal ((x1, y1), (x2, y2))] 
-        ver = [((x1, y1), (x2, y2)) | ((x1, y1), (x2, y2)) <- allLines size, y1 == num, not (horizontal ((x1, y1), (x2, y2)))]
-    in  (horStr hor played size) ++ "*\n" ++ (verStr ver played size (p1, p2)) ++ "\n"
+    let hor = [((x, num), True) | x <- [0..size-2]] 
+        ver = [((x, num), False) | x <- [0..size-1]]
+        horStr [] = []
+        horStr (x:xs) = (horizontalLine x played size) ++ horStr xs
+        verStr [] = []
+        verStr (x:xs) = (verticalLine x played size (p1,p2)) ++ verStr xs
+    in  (horStr hor) ++ "*\n" ++ (verStr ver) ++ "\n"
 
-horStr [] _ _ = []
-horStr (x:xs) played size = (horizontalLine x played size) ++ horStr xs played size
+horizontalLine line played size = if line `elem` played then "*---" else "*   "
 
-verStr [] _ _ _ = []
-verStr (x:xs) played size (p1, p2) = (verticalLine x played size (p1,p2)) ++ verStr xs played size (p1, p2)
-
-horizontalLine line@((_,_), (x,y)) played size = if line `elem` played then "*---" else "*   "
-
-verticalLine line@((x1, y1), (x2,y2)) played size (p1, p2) =
+verticalLine line@(dot, False) played size (p1, p2) =
    let str = if line `elem` played then "|" else " "
        num
-          | (x1, y1) `elem` p1 = " 1 "
-          | (x1, y1) `elem` p2 = " 2 "
+          | dot `elem` p1 = " 1 "
+          | dot `elem` p2 = " 2 "
           | otherwise = "   "
    in str ++ num
+
+{-
+bestPlay:: Dictionary -> Hand -> Play 
+bestPlay dict [] = []
+bestPlay dict hand =
+   let vMoves = validMoves dict hand
+       plays = [move:(bestPlay vMoves (updateHand hand move)) | move <- vMoves]
+       scoreValidPlays = [(scorePlay play, play) | play <- plays, isValidPlay vMoves hand play]
+   in  if null vMoves then [] else snd (maximum scoreValidPlays)
+-}
+
+
+whoWillWin :: Board -> Outcome
+whoWillWin game@(size, board, scores, player) =
+   let vMoves = validMoves game
+       result = whoHasWon 
+
+-- 
+-- Full credit Maybe Move
+bestMove :: Board -> Maybe Move
+bestMove game@(size, board, scores, player) = 
+   let vMoves = validMoves game
+       plays [] = []
+       plays (x:xs) =
+          let updatedGame = makeMove game x
+          in case updatedGame of
+                          Nothing -> Nothing
+                          Just newGame -> (x, updatedGame):(bestMove vMoves updatedGame) ++ plays xs
+       outcomes = [(outcome, x) | x <- plays]
+       state = checkBoard game
+   in if state == GameOver then [] else Just snd (chooseOutcome outcomes player (head chooseOutcome))
+
+chooseOutcome [] _ best = best
+chooseOutcome (x:xs) player (best, move) = if best == Winner player
+                                              then (best, move)
+                                              else 
+
+{-
+readGame :: String -> Game (Full Credit: Maybe Game)
+readGame = undefined
+
+showGame :: Game -> String
+showGame = undefined
+
+writeGame :: Game -> String -> IO ()
+writeGame = undefined
+
+readGame :: String -> IO Game (Full Credit: IO (Maybe Game))
+readGame = undefined
+
+putWinner :: Game -> IO ()
+putWinner = undefined
+-}
 
 {-
 Player: Player1
