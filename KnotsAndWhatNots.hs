@@ -121,31 +121,34 @@ bestPlay dict hand =
    in  if null vMoves then [] else snd (maximum scoreValidPlays)
 -}
 
-
+--given current board state, calculate future moves
 whoWillWin :: Board -> Outcome
 whoWillWin game@(size, board, scores, player) =
    let vMoves = validMoves game
-       result = whoHasWon 
+       futurePlays = concatMaybes [makeMove game move | move <- vMoves] --[boards(valid moves)]
+       state = [checkBoard game | game <- futurePlays ]
+       outcomes = [(whowillWin game, x) | (x,game) <- plays vMoves] --check outof future plays -> a finished gamestate && where player# wins/ties
+   in if state == GameOver then [] else Just snd (chooseOutcome outcomes player (head outcomes))
 
--- 
+{-
 -- Full credit Maybe Move
 bestMove :: Board -> Maybe Move
 bestMove game@(size, board, scores, player) = 
    let vMoves = validMoves game
-       plays [] = []
-       plays (x:xs) =
-          let updatedGame = makeMove game x
+       plays [] _ = []
+       plays (x:xs) currentGame = 
+          let updatedGame = makeMove currentGame x
           in case updatedGame of
                           Nothing -> Nothing
-                          Just newGame -> (x, updatedGame):(bestMove vMoves updatedGame) ++ plays xs
-       outcomes = [(outcome, x) | x <- plays]
+                          Just newGame -> (x, updatedGame):(bestMove vMoves updatedGame) ++ plays xs updatedGame
+       outcomes = [(whowillWin game, x) | (x,game) <- plays vMoves]
        state = checkBoard game
-   in if state == GameOver then [] else Just snd (chooseOutcome outcomes player (head chooseOutcome))
+   in if state == GameOver then [] else Just snd (chooseOutcome outcomes player (head outcomes))
 
 chooseOutcome [] _ best = best
 chooseOutcome (x:xs) player (best, move) = if best == Winner player
                                               then (best, move)
-                                              else 
+                                              else []
 
 {-
 readGame :: String -> Game (Full Credit: Maybe Game)
