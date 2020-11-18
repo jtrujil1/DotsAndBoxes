@@ -111,6 +111,24 @@ verticalLine line@(dot, False) played size (p1, p2) =
           | otherwise = "   "
    in str ++ num
 
+
+whoWillWin::Board -> Outcome
+whoWillWin game@(size, board, scores, player) = 
+  case checkBoard game of 
+      GameOver outcome -> outcome
+      Ongoing -> 
+        let vMoves = validMoves game
+            futurePlays = catMaybes [makeMove game move | move <- vMoves]
+            outcomes = [whoWillWin newGame| newGame <- futurePlays]--Winner Playeo
+        in chooseOutcome outcomes player
+
+chooseOutcome :: [Outcome] -> Player -> Outcome
+choseOutcome outcomes player =
+  let allWins = [x| x <- outcomes, x /= Tie]
+      ties = [x| x <- outcomes, x == Tie]
+    case Player of
+                Player1 -> if Winner Player1 `elem` allWins then Winner Player1 else if null ties then Winner Player2 else Tie
+                Player2 -> if Winner Player2 `elem` allWins then Winner Player2 else if null ties then Winner Player1 else Tie
 {-
 bestPlay:: Dictionary -> Hand -> Play 
 bestPlay dict [] = []
@@ -153,10 +171,7 @@ bestMove game@(size, board, scores, player) =
        state = checkBoard game
    in if state == GameOver then [] else Just snd (chooseOutcome outcomes player (head outcomes))
 
-chooseOutcome [] _ best = best
-chooseOutcome (x:xs) player (best, move) = if best == Winner player
-                                              then (best, move)
-                                              else []
+
 
 
 readGame :: String -> Game (Full Credit: Maybe Game)
