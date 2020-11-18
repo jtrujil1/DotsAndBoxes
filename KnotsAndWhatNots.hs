@@ -122,14 +122,22 @@ bestPlay dict hand =
 -}
 
 --given current board state, calculate future moves
+{-
 whoWillWin :: Board -> Outcome
 whoWillWin game@(size, board, scores, player) =
-   let vMoves = validMoves game
-       futurePlays = concatMaybes [makeMove game move | move <- vMoves] --[boards(valid moves)]
-       state = [checkBoard game | game <- futurePlays ]
-       outcomes = [(whowillWin game, x) | (x,game) <- plays vMoves] --check outof future plays -> a finished gamestate && where player# wins/ties
-   in if state == GameOver then [] else Just snd (chooseOutcome outcomes player (head outcomes))
+   let --plays = [let updatedGame = makeMove game move in move:(whoWillWin vMoves (fromJust updatedGame) )| move <- vMoves, updatedGame != Nothing] 
+       futureMoves = catMaybes [(makeMove game move) | move <- (validMoves game)]
+       gameStates = [(checkBoard game, game) | game <- futureMoves]
+       outcomes = catMaybes [if state == Ongoing then (whoWillWin game) else winner game | (state,game) <- gameStates] --check outof future plays -> a finished gamestate && where player# wins/ties
+   in  if Winner player ´elem´ outcomes then 
+--Just snd (chooseOutcome outcomes player (head outcomes))
 
+helperBlah :: [Move] -> Maybe Board -> Board
+helperBlah [] currentGame = currentGame
+helperBlah (vM: vMs) Just currentGame = 
+    [helperBlah vMs (makeMove currentGame move) | move <- vM]
+helperBlah _ Nothing = 
+-}
 {-
 -- Full credit Maybe Move
 bestMove :: Board -> Maybe Move
@@ -150,7 +158,7 @@ chooseOutcome (x:xs) player (best, move) = if best == Winner player
                                               then (best, move)
                                               else []
 
-{-
+
 readGame :: String -> Game (Full Credit: Maybe Game)
 readGame = undefined
 
