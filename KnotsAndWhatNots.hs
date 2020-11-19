@@ -14,7 +14,7 @@ data Player = Player1 | Player2 deriving (Show, Eq, Ord)
 type PlayerScores = ([Box],[Box])
 data Outcome = Winner Player | Tie deriving (Show, Eq, Ord)
 data GameState = Ongoing | GameOver Outcome deriving (Show, Eq, Ord)
-type Board = (Int, [Line], PlayerScores, Player)
+type Game = (Int, [Line], PlayerScores, Player)
 
 allDots size = [(x,y)| x <- [0..size-1], y <- [0..size-1]]
 
@@ -27,13 +27,13 @@ readStr :: String -> String -> Maybe Line
 readStr = undefined 
 
 --creates original board at the beginning
-createBoard :: Int -> Board
-createBoard size =
+createGame :: Int -> Game
+createGame size =
    let lines = allLines size
    in (size, lines, ([],[]), Player1)
 
 --check if board is full
-checkBoard :: Board -> GameState
+checkBoard :: Game -> GameState
 checkBoard game@(_, board, _, _) = if null board then GameOver (winner game) else Ongoing
 
 --remove line from board
@@ -46,17 +46,17 @@ validBox:: Int -> PlayerScores -> Box -> Bool
 validBox size (p1, p2) (x,y) = (x >= 0 && x < size-1) && (y >= 0 && y < size-1) && ((x,y) `notElem` (p1++p2))
 
 --depends if our board is holding the moves done or moves left
-validMoves :: Board -> [Move]
+validMoves :: Game -> [Move]
 validMoves (_, lines, _,_) = lines
 
-makeMove :: Board -> Move -> Maybe Board
+makeMove :: Game -> Move -> Maybe Game
 makeMove game@(size, board, scores, player) line =
    let valid = line `elem` board
        newBoard = updateBoard line board
        boxes = validNewBoxes (size, newBoard, scores, player) line
    in if valid then Just (updateScores (size, newBoard, scores, player) boxes) else Nothing
 
-validNewBoxes :: Board -> Move -> [Box]
+validNewBoxes :: Game -> Move -> [Box]
 validNewBoxes (size, board, scores, player) ((x,y), dir) =
    let possibleBoxes = if dir
                             then filter (validBox size scores) [(x,y),(x,y-1)]
@@ -68,7 +68,7 @@ validNewBoxes (size, board, scores, player) ((x,y), dir) =
 linesOfBox :: Box -> (Line, Line, Line, Line)
 linesOfBox (x,y) = (((x,y), True),((x,y), False),((x,y+1), True),((x+1,y), False))
 
-updateScores :: Board -> [Box] -> Board
+updateScores :: Game -> [Box] -> Game
 updateScores (size, board, (p1, p2), player) boxes =
     let noBoxes = null boxes
     in case player of
@@ -77,14 +77,14 @@ updateScores (size, board, (p1, p2), player) boxes =
 
 --checks highest number of box to declare winner
 --maybe it should return a Maybe outcome???????
-winner :: Board -> Outcome
+winner :: Game -> Outcome
 winner (size, board, (boxes1, boxes2), _) =
    let scores@[(score1, p1), (score2, p2)] = [(length boxes1, Player1), (length boxes2, Player2)]
        champ = snd $ maximum scores
    in if score1 == score2 then Tie else Winner champ
 
 --create a string that show the current state of the game
-prettyShow :: Board -> String
+prettyShow :: Game -> String
 prettyShow game@(size, board, (p1, p2), player) = 
    let played = filter (\x -> x `notElem` board) (allLines size)
        boardStr = concat [rowStr num played game | num <- [0..size-1]]
@@ -111,24 +111,24 @@ verticalLine line@(dot, False) played size (p1, p2) =
           | otherwise = "   "
    in str ++ num
 
-
-whoWillWin::Board -> Outcome
+whoWillWin :: Game -> Outcome
 whoWillWin game@(size, board, scores, player) = 
   case checkBoard game of 
       GameOver outcome -> outcome
       Ongoing -> 
         let vMoves = validMoves game
             futurePlays = catMaybes [makeMove game move | move <- vMoves]
-            outcomes = [whoWillWin newGame| newGame <- futurePlays]--Winner Playeo
+            outcomes = [whoWillWin newGame| newGame <- futurePlays]--Winner Player
         in chooseOutcome outcomes player
 
 chooseOutcome :: [Outcome] -> Player -> Outcome
-choseOutcome outcomes player =
-  let allWins = [x| x <- outcomes, x /= Tie]
-      ties = [x| x <- outcomes, x == Tie]
-    case Player of
+chooseOutcome outcomes player =
+   let allWins = [x | x <- outcomes, x /= Tie]
+       ties = [x | x <- outcomes, x == Tie]
+   in  case player of
                 Player1 -> if Winner Player1 `elem` allWins then Winner Player1 else if null ties then Winner Player2 else Tie
                 Player2 -> if Winner Player2 `elem` allWins then Winner Player2 else if null ties then Winner Player1 else Tie
+
 {-
 bestPlay:: Dictionary -> Hand -> Play 
 bestPlay dict [] = []
@@ -141,7 +141,7 @@ bestPlay dict hand =
 
 --given current board state, calculate future moves
 {-
-whoWillWin :: Board -> Outcome
+whoWillWin :: Game -> Outcome
 whoWillWin game@(size, board, scores, player) =
    let --plays = [let updatedGame = makeMove game move in move:(whoWillWin vMoves (fromJust updatedGame) )| move <- vMoves, updatedGame != Nothing] 
        futureMoves = catMaybes [(makeMove game move) | move <- (validMoves game)]
@@ -158,7 +158,7 @@ helperBlah _ Nothing =
 -}
 {-
 -- Full credit Maybe Move
-bestMove :: Board -> Maybe Move
+bestMove :: Game -> Maybe Move
 bestMove game@(size, board, scores, player) = 
    let vMoves = validMoves game
        plays [] _ = []
@@ -170,25 +170,44 @@ bestMove game@(size, board, scores, player) =
        outcomes = [(whowillWin game, x) | (x,game) <- plays vMoves]
        state = checkBoard game
    in if state == GameOver then [] else Just snd (chooseOutcome outcomes player (head outcomes))
+-}
 
+readGame :: String -> Maybe Game --(Full Credit: Maybe Game)
+readGame str =
+   let [sizeStr, boardStr, p1Str, p2Str, playerStr] = splitOn "*" str
+       size = read sizeStr::Int
+       board = [read x::((Int, Int), Bool) | x <- (splitOn "." boardStr)]
+       p1 = [read x::(Int, Int) | x <- (splitOn "." p1Str)]
+       p2 = [read x::(Int, Int) | x <- (splitOn "." p2Str)]
+       player = if playerStr == "1" then Player1 else Player2
+   in if length (splitOn "*" str) == 5 then Just (size, board, (p1, p2), player) else Nothing
 
-
-
-readGame :: String -> Game (Full Credit: Maybe Game)
-readGame = undefined
+--read s::(Int, Int)
+--read str::((Int, Int), Bool)
+--splitOn "*" str
+--["3","((1,0),True).((2,0),False)","(0,0).(0,1)","(1,1)","2\n"]
 
 showGame :: Game -> String
-showGame = undefined
+showGame game@(size, board, (p1, p2), player) =
+   let gameStr = show size ++ "*"
+       str [] = "*"
+       str (x:xs) = show x ++ (if xs /= [] then "." else "") ++ str xs
+       p = if player == Player1 then "1" else "2"
+   in gameStr ++ str board ++ str p1 ++ str p2 ++ p ++ "\n"
 
 writeGame :: Game -> String -> IO ()
-writeGame = undefined
+writeGame game fileName = 
+   let gameStr = showGame game
+   in writeFile "Game.txt" gameStr
+       
 
-readGame :: String -> IO Game (Full Credit: IO (Maybe Game))
-readGame = undefined
+--readGame :: String -> IO Game (Full Credit: IO (Maybe Game))
+--readGame = undefined
+--   do content <- readFile "Game.txt"
 
 putWinner :: Game -> IO ()
-putWinner = undefined
--}
+putWinner game = putStrLn $ prettyShow game
+
 
 {-
 Player: Player1
