@@ -16,15 +16,12 @@ data Outcome = Winner Player | Tie deriving (Show, Eq, Ord)
 data GameState = Ongoing | GameOver Outcome deriving (Show, Eq, Ord)
 type Game = (Int, [Line], PlayerScores, Player)
 
+
 allDots size = [(x,y)| x <- [0..size-1], y <- [0..size-1]]
 
 allBoxes size = [(x,y)| x <- [0..size-2], y <- [0..size-2]]
 
 allLines size = [((x,y), True) | x <- [0..size-2], y <- [0..size-1]] ++ [((x,y), False) | x <- [0..size-1], y <- [0..size-2]]
-
---turn input into dots for lines
-readStr :: String -> String -> Maybe Line 
-readStr = undefined 
 
 --creates original board at the beginning
 createGame :: Int -> Game
@@ -76,7 +73,6 @@ updateScores (size, board, (p1, p2), player) boxes =
             Player2 -> if noBoxes then (size, board, (p1, p2), Player1) else (size, board, (p1, p2++boxes), Player2)
 
 --checks highest number of box to declare winner
---maybe it should return a Maybe outcome???????
 winner :: Game -> Outcome
 winner (size, board, (boxes1, boxes2), _) =
    let scores@[(score1, p1), (score2, p2)] = [(length boxes1, Player1), (length boxes2, Player2)]
@@ -118,95 +114,86 @@ whoWillWin game@(size, board, scores, player) =
       Ongoing -> 
         let vMoves = validMoves game
             futurePlays = catMaybes [makeMove game move | move <- vMoves]
-            outcomes = [whoWillWin newGame| newGame <- futurePlays]--Winner Player
+            outcomes = [whoWillWin newGame| newGame <- futurePlays]
         in chooseOutcome outcomes player
 
 chooseOutcome :: [Outcome] -> Player -> Outcome
-chooseOutcome outcomes player =
-   let allWins = [x | x <- outcomes, x /= Tie]
-       ties = [x | x <- outcomes, x == Tie]
-   in  case player of
-                Player1 -> if Winner Player1 `elem` allWins then Winner Player1 else if null ties then Winner Player2 else Tie
-                Player2 -> if Winner Player2 `elem` allWins then Winner Player2 else if null ties then Winner Player1 else Tie
+chooseOutcome outcomes player
+   | Winner player `elem` outcomes = Winner player 
+   | Tie `elem` outcomes = Tie
+   | otherwise = Winner (opponent player)
 
-{-
-bestPlay:: Dictionary -> Hand -> Play 
-bestPlay dict [] = []
-bestPlay dict hand =
-   let vMoves = validMoves dict hand
-       plays = [move:(bestPlay vMoves (updateHand hand move)) | move <- vMoves]
-       scoreValidPlays = [(scorePlay play, play) | play <- plays, isValidPlay vMoves hand play]
-   in  if null vMoves then [] else snd (maximum scoreValidPlays)
--}
+opponent Player1 = Player2
+opponent Player2 = Player1
 
---given current board state, calculate future moves
-{-
-whoWillWin :: Game -> Outcome
-whoWillWin game@(size, board, scores, player) =
-   let --plays = [let updatedGame = makeMove game move in move:(whoWillWin vMoves (fromJust updatedGame) )| move <- vMoves, updatedGame != Nothing] 
-       futureMoves = catMaybes [(makeMove game move) | move <- (validMoves game)]
-       gameStates = [(checkBoard game, game) | game <- futureMoves]
-       outcomes = catMaybes [if state == Ongoing then (whoWillWin game) else winner game | (state,game) <- gameStates] --check outof future plays -> a finished gamestate && where player# wins/ties
-   in  if Winner player ´elem´ outcomes then 
---Just snd (chooseOutcome outcomes player (head outcomes))
+bestMove :: Game -> Maybe Move 
+bestMove game@(size, board, scores,player) = 
+  let vMoves = validMoves game
+      futurePlays = zip vMoves (catMaybes [makeMove game move | move <- vMoves])
+      outcomes = [(whoWillWin newGame, move)| (move, newGame) <- futurePlays]
+  in if null vMoves then Nothing else (bestOutcome outcomes player)
 
-helperBlah :: [Move] -> Maybe Board -> Board
-helperBlah [] currentGame = currentGame
-helperBlah (vM: vMs) Just currentGame = 
-    [helperBlah vMs (makeMove currentGame move) | move <- vM]
-helperBlah _ Nothing = 
--}
-{-
--- Full credit Maybe Move
-bestMove :: Game -> Maybe Move
-bestMove game@(size, board, scores, player) = 
-   let vMoves = validMoves game
-       plays [] _ = []
-       plays (x:xs) currentGame = 
-          let updatedGame = makeMove currentGame x
-          in case updatedGame of
-                          Nothing -> Nothing
-                          Just newGame -> (x, updatedGame):(bestMove vMoves updatedGame) ++ plays xs updatedGame
-       outcomes = [(whowillWin game, x) | (x,game) <- plays vMoves]
-       state = checkBoard game
-   in if state == GameOver then [] else Just snd (chooseOutcome outcomes player (head outcomes))
--}
+bestOutcome :: [(Outcome, Move)] -> Player-> Maybe Move
+bestOutcome lst player = case lookup (Winner player) lst of
+                              Nothing -> case lookup Tie lst of 
+                                         Nothing -> case lookup (Winner (opponent player)) lst of 
+                                                    Nothing -> Nothing
+                                                    move -> move
+                                         move -> move
+                              move -> move
 
 readGame :: String -> Maybe Game --(Full Credit: Maybe Game)
 readGame str =
-   let [sizeStr, boardStr, p1Str, p2Str, playerStr] = splitOn "*" str
-       size = read sizeStr::Int
-       board = [read x::((Int, Int), Bool) | x <- (splitOn "." boardStr)]
-       p1 = [read x::(Int, Int) | x <- (splitOn "." p1Str)]
-       p2 = [read x::(Int, Int) | x <- (splitOn "." p2Str)]
-       player = if playerStr == "1" then Player1 else Player2
-   in if length (splitOn "*" str) == 5 then Just (size, board, (p1, p2), player) else Nothing
-
---read s::(Int, Int)
---read str::((Int, Int), Bool)
---splitOn "*" str
---["3","((1,0),True).((2,0),False)","(0,0).(0,1)","(1,1)","2\n"]
+   let [sizeStr, boardStr, p1Str, p2Str, playerStr] = splitOn "\n" str
+       size = read sizeStr
+       unStr str = [read x | x <- splitOn "." str]
+       board = unStr boardStr 
+       p1 = unStr p1Str 
+       p2 = unStr p2Str 
+       player = case playerStr of
+                       "1" -> Player1
+                       "2" -> Player2
+   in if length (splitOn "\n" str) == 5 then Just (size, board, (p1, p2), player) else Nothing
 
 showGame :: Game -> String
 showGame game@(size, board, (p1, p2), player) =
-   let gameStr = show size ++ "*"
-       str [] = "*"
-       str (x:xs) = show x ++ (if xs /= [] then "." else "") ++ str xs
-       p = if player == Player1 then "1" else "2"
-   in gameStr ++ str board ++ str p1 ++ str p2 ++ p ++ "\n"
+   let str lst = intercalate "." ( map show lst )
+       p = case player of
+                  Player1 -> "1"
+                  Player2 -> "2"
+   in intercalate "\n" [show size, str board, str p1, str p2, p]
+
 
 writeGame :: Game -> String -> IO ()
 writeGame game fileName = 
    let gameStr = showGame game
-   in writeFile "Game.txt" gameStr
+   in writeFile fileName gameStr
        
+loadGame :: FilePath -> IO Game
+loadGame fp =
+   do str <- readFile fp
+      case readGame str of
+              Just game -> return game 
+              Nothing -> return (createGame 3) --Ask Fogarty what this is
+{-
+Also do we need this one too??????????
+readGame :: String -> IO Game --(Full Credit: IO (Maybe Game))
+readGame str = case readGame str of
+                 Just game -> putStrLn $ prettyShow game
+                 Nothing -> createBoard 3
+-}
 
---readGame :: String -> IO Game (Full Credit: IO (Maybe Game))
---readGame = undefined
---   do content <- readFile "Game.txt"
-
+--call whoWillWin function but make it pretty
 putWinner :: Game -> IO ()
-putWinner game = putStrLn $ prettyShow game
+putWinner game =
+   let winnerStr = case whoWillWin game of
+                     Winner player -> case player of
+                                           Player1 -> "Player1"
+                                           Player2 -> "Player2"
+                     Tie -> "Tie"
+   in do case winnerStr of
+                 "Tie" -> putStrLn $ "It's a tie"
+                 otherwise -> putStrLn $ "And the winner is ... " ++ winnerStr ++ "!!!"
 
 
 {-
