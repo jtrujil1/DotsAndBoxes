@@ -146,20 +146,19 @@ bestOutcome lst player =
 
 readGame :: String -> Maybe Game
 readGame str =
-   let [sizeStr, boardStr, p1Str, p2Str, playerStr] = splitOn "\n" str
-       unStr str = sequence [readMaybe x | x <- splitOn "." str]
-   in  if length (splitOn "\n" str) == 5
-           then
-                do size <- readMaybe sizeStr
-                   board <- unStr boardStr 
-                   p1 <- unStr p1Str 
-                   p2 <- unStr p2Str 
-                   player <- case (playerStr) of
-                                  "1" -> Just Player1
-                                  "2" -> Just Player2
-                                  _ -> Nothing
-                   return (size, board, (p1, p2), player)
-           else Nothing
+   case splitOn "\n" str of
+      [sizeStr, boardStr, p1Str, p2Str, playerStr] ->
+         do let unStr str = sequence [readMaybe x | x <- splitOn "." str] 
+            size <- readMaybe sizeStr
+            board <- unStr boardStr 
+            p1 <- unStr p1Str 
+            p2 <- unStr p2Str 
+            player <- case playerStr of
+                           "1" -> Just Player1
+                           "2" -> Just Player2
+                           _ -> Nothing
+            return (size, board, (p1, p2), player)
+      _ -> Nothing
 
 showGame :: Game -> String
 showGame game@(size, board, (p1, p2), player) =
