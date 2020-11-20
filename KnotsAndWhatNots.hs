@@ -136,41 +136,30 @@ bestMove game@(size, board, scores,player) =
   in if null vMoves then Nothing else (bestOutcome outcomes player)
 
 bestOutcome :: [(Outcome, Move)] -> Player-> Maybe Move
-bestOutcome lst player = case lookup (Winner player) lst of
-                              Nothing -> case lookup Tie lst of 
-                                         Nothing -> case lookup (Winner (opponent player)) lst of 
-                                                    Nothing -> Nothing
-                                                    move -> move
-                                         move -> move
-                              move -> move
-{-
-readGame :: String -> Maybe Game
-readGame str =
-   let [sizeStr, boardStr, p1Str, p2Str, playerStr] = splitOn "\n" str
-       size = read sizeStr
-       unStr str = [read x | x <- splitOn "." str]
-       board = unStr boardStr 
-       p1 = unStr p1Str 
-       p2 = unStr p2Str 
-       player = case playerStr of
-                       "1" -> Player1
-                       "2" -> Player2
-   in if length (splitOn "\n" str) == 5 then Just (size, board, (p1, p2), player) else Nothing
--}
+bestOutcome lst player = 
+   let losses = [m | (o, m) <- lst, o == (Winner (opponent player))]
+   in  case lookup (Winner player) lst of
+             Nothing -> case lookup Tie lst of 
+                             Nothing -> Just $ head losses
+                             move -> move
+             move -> move
 
 readGame :: String -> Maybe Game
 readGame str =
    let [sizeStr, boardStr, p1Str, p2Str, playerStr] = splitOn "\n" str
        unStr str = sequence [readMaybe x | x <- splitOn "." str]
-   in  do size <- readMaybe sizeStr
-          board <- unStr boardStr 
-          p1 <- unStr p1Str 
-          p2 <- unStr p2Str 
-          player <- case playerStr of
-                         "1" -> Just Player1
-                         "2" -> Just Player2
-                         _ -> Nothing
-       if length (splitOn "\n" str) == 5 then return (size, board, (p1, p2), player) else Nothing
+   in  if length (splitOn "\n" str) == 5
+           then
+                do size <- readMaybe sizeStr
+                   board <- unStr boardStr 
+                   p1 <- unStr p1Str 
+                   p2 <- unStr p2Str 
+                   player <- case (playerStr) of
+                                  "1" -> Just Player1
+                                  "2" -> Just Player2
+                                  _ -> Nothing
+                   return (size, board, (p1, p2), player)
+           else Nothing
 
 showGame :: Game -> String
 showGame game@(size, board, (p1, p2), player) =
@@ -190,14 +179,6 @@ loadGame :: FilePath -> IO (Maybe Game)
 loadGame fp =
    do str <- readFile fp
       return $ readGame str
-
-{-
-Also do we need this one too??????????
-readGame :: String -> IO Game --(Full Credit: IO (Maybe Game))
-readGame str = case readGame str of
-                 Just game -> putStrLn $ prettyShow game
-                 Nothing -> createBoard 3
--}
 
 putWinner :: Game -> IO ()
 putWinner game =
