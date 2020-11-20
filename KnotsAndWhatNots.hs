@@ -4,6 +4,8 @@ import Data.List
 import Data.List.Split
 import Data.Maybe
 import Debug.Trace
+import Text.Read (readMaybe)
+import Data.Char (toUpper)
 
 --Data Types--
 type Dot = (Int, Int)
@@ -141,8 +143,8 @@ bestOutcome lst player = case lookup (Winner player) lst of
                                                     move -> move
                                          move -> move
                               move -> move
-
-readGame :: String -> Maybe Game --(Full Credit: Maybe Game)
+{-
+readGame :: String -> Maybe Game
 readGame str =
    let [sizeStr, boardStr, p1Str, p2Str, playerStr] = splitOn "\n" str
        size = read sizeStr
@@ -154,10 +156,25 @@ readGame str =
                        "1" -> Player1
                        "2" -> Player2
    in if length (splitOn "\n" str) == 5 then Just (size, board, (p1, p2), player) else Nothing
+-}
+
+readGame :: String -> Maybe Game
+readGame str =
+   let [sizeStr, boardStr, p1Str, p2Str, playerStr] = splitOn "\n" str
+       unStr str = sequence [readMaybe x | x <- splitOn "." str]
+   in  do size <- readMaybe sizeStr
+          board <- unStr boardStr 
+          p1 <- unStr p1Str 
+          p2 <- unStr p2Str 
+          player <- case playerStr of
+                         "1" -> Just Player1
+                         "2" -> Just Player2
+                         _ -> Nothing
+       if length (splitOn "\n" str) == 5 then return (size, board, (p1, p2), player) else Nothing
 
 showGame :: Game -> String
 showGame game@(size, board, (p1, p2), player) =
-   let str lst = intercalate "." ( map show lst )
+   let str lst = intercalate "." $ map show lst
        p = case player of
                   Player1 -> "1"
                   Player2 -> "2"
@@ -169,12 +186,11 @@ writeGame game fileName =
    let gameStr = showGame game
    in writeFile fileName gameStr
        
-loadGame :: FilePath -> IO Game
+loadGame :: FilePath -> IO (Maybe Game)
 loadGame fp =
    do str <- readFile fp
-      case readGame str of
-              Just game -> return game 
-              Nothing -> return (createGame 3) --Ask Fogarty what this is
+      return $ readGame str
+
 {-
 Also do we need this one too??????????
 readGame :: String -> IO Game --(Full Credit: IO (Maybe Game))
@@ -183,17 +199,15 @@ readGame str = case readGame str of
                  Nothing -> createBoard 3
 -}
 
---call whoWillWin function but make it pretty
 putWinner :: Game -> IO ()
 putWinner game =
    let winnerStr = case whoWillWin game of
-                     Winner player -> case player of
-                                           Player1 -> "Player1"
-                                           Player2 -> "Player2"
-                     Tie -> "Tie"
+                     Winner Player1 -> "Player1"
+                     Winner Player2 -> "Player2"
+                     Tie -> "T"
    in do case winnerStr of
-                 "Tie" -> putStrLn $ "It's a tie"
-                 otherwise -> putStrLn $ "And the winner is ... " ++ winnerStr ++ "!!!"
+                 "T" -> putStrLn $ "It's a tie!!!"
+                 otherwise -> putStrLn $ "And the winner is ... " ++ (map (toUpper) winnerStr) ++ "!!!"
 
 
 {-
