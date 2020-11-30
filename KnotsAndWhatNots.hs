@@ -189,18 +189,29 @@ putWinner game =
                  "T" -> putStrLn $ "It's a tie!!!"
                  otherwise -> putStrLn $ "And the winner is ... " ++ (map (toUpper) winnerStr) ++ "!!!"
 
+evaluation :: Game -> Int
+evaluation game@(size, board, (p1, p2), player) = 
+   case checkBoard game of 
+      GameOver Tie -> 0
+      GameOver Winner Player1 -> ((size-1)^2) + 1
+      GameOver Winner Player2 -> - $ ((size-1)^2) + 1
+      Ongoing -> 
+          let scores@(score1, score2) = (length p1, length p2)
+          in case max scores of
+                  score1 -> score1
+                  score2 -> - score2
 
 {-
 Player: Player1
 Score : 5
 ===================
-*   *   *   *   *
+*   *   *   *   
 
-*   *   *   *   *
+*   *   *   *   
 
-*   *   *   *   *
+*   *   *   *   
 
-*   *   *   *   *
+*   *   *   *   
 ===================
 
 --}
