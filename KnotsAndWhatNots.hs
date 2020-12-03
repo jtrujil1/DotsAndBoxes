@@ -193,37 +193,46 @@ eval :: Game -> Int
 eval game@(size, board, (p1, p2), player) = 
    case checkBoard game of 
       GameOver Tie -> 0
-      GameOver Winner Player1 -> ((size-1)^2) + 1
-      GameOver Winner Player2 -> - $ ((size-1)^2) + 1
+      GameOver (Winner Player1) -> (size-1)^2 + 1
+      GameOver (Winner Player2) -> negate $ (size-1)^2 + 1
       Ongoing -> 
-          let scores@(score1, score2) = (length p1, length p2)
-          in case max scores of
-                  score1 -> score1
-                  score2 -> - score2
+          let (score1, score2) = (length p1, length p2)
+          in max score1 score2
 
---Should it take in a player??
---or do we assume it's the best move for whoever's turn it is
+--like bestMove but limited by the depth
+--not sure if we should be calling whoWillMaybeWin with (depth-1) or just depth haven't checked
 goodMove :: Game -> Int -> Maybe Move
-goodMove game depth =
+goodMove game@(size, board, (p1, p2), player) depth =
   let vMoves = validMoves game
       futurePlays = zip vMoves (catMaybes [makeMove game move | move <- vMoves])
-      evals = [(evaluate newGame, move)| (move, newGame) <- futurePlays]
-  in null vMoves then Nothing else Just (bestEval evals player)
+      evals = [(whoWillMaybeWin newGame (depth-1), move)| (move, newGame) <- futurePlays]
+  in if null vMoves then Nothing else Just (bestEval evals player)
 
-evaluate game@(size, board, scores, player) depth = 
-  case checkBoard game of 
-      GameOver outcome -> eval game
-      Ongoing -> 
-        let vMoves = validMoves game
-            futurePlays = zip vMoves (catMaybes [makeMove game move | move <- vMoves])
-            evals = [evaluate newGame| (move, newGame) <- futurePlays]
-        in if depth > 0 then 0 else eval game
-
+--chooses the best move depending on whose player's turn it is
 bestEval :: [(Int, Move)] -> Player-> Move
 bestEval lst player = 
    case player of
         Player1 -> snd $ maximum lst
         Player2 -> snd $ minimum lst
+
+--like whoWillWin but limited by depth
+whoWillMaybeWin :: Game -> Int -> Int 
+whoWillMaybeWin game@(size, board, scores, player) depth = 
+  case checkBoard game of 
+      GameOver outcome -> eval game
+      Ongoing -> 
+        let vMoves = validMoves game
+            futurePlays = zip vMoves (catMaybes [makeMove game move | move <- vMoves])
+            evals = [whoWillMaybeWin newGame (depth-1) | (move, newGame) <- futurePlays]
+        in if depth <= 0 then 0 else chooseEval evals player
+
+--chooses the best outcome depending on whose player's turn it is
+chooseEval :: [Int] -> Player -> Int
+chooseEval lst player =
+   case player of
+        Player1 -> maximum lst
+        Player2 -> minimum lst
+
 
 {-
 Player: Player1
