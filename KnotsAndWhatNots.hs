@@ -142,40 +142,6 @@ computeGoodMove game depth =
       makeMove game goodM
 
 
-{-
-      case updateGame of
-           Nothing -> putStrLn "Invalid move.\nThere was a problem calculating a move.\nExiting program."
-                      exitFailure
-           Just newGame -> putStrLn $ prettyShow newGame
--}
-
-{-
-prompt :: String -> IO String
-prompt question =
-  do putStr $ question ++ ": "
-     hFlush stdout
-     getLine
-
-
-getMv :: String -> IO Move
-getMv line = 
-do answer <- prompt question
-     case readMaybe answer of
-        Just x -> return x
-        Nothing -> do putStrLn "You didn't give me a good number. I'm just going to use 6. Like you. You're a six."
-                      return 6
-getXY :: String -> Move
-getXY
-
-getNumber :: String -> IO Int
-getNumber question =
-  do answer <- prompt question
-     case readMaybe answer of
-        Just x -> return x
-        Nothing -> do putStrLn "You didn't give me a good number. I'm just going to use 6. Like you. You're a six."
-                      return 6
--}
-
 allDots size = [(x,y)| x <- [0..size-1], y <- [0..size-1]]
 
 allBoxes size = [(x,y)| x <- [0..size-2], y <- [0..size-2]]
