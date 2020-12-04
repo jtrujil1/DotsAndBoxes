@@ -37,7 +37,6 @@ main =
   do args <- getArgs
      let (flags, inputs, errors) = getOpt Permute options args
      putStrLn $ show (flags, inputs, errors)
-     --sequence $ map putStrLn args
      let filename = case inputs of
                         []      -> "game.txt"
                         [fname] -> fname 
@@ -84,12 +83,19 @@ startGame flags game =
      mMove <- getMv flags
      if Best `elem` flags
         then printBestMove game
-        else if (Mv _) `elem` flags
+        else if checkFlags flags
                 then case mMove of
                           Nothing -> do putStrLn "Invalid move.\nA move should be in the format of: x,y,direction (direction is either h or v)\nExiting program."
                                         exitFailure
                           Just move -> printMove game move
                 else printGoodMove game depth
+
+
+checkFlags :: [Flag] -> Bool
+checkFlags [] = False
+checkFlags ((Mv m):fs) = True
+checkFlags (_:fs) = checkFlags fs
+
 {-
      x <-
       case mMove of
@@ -106,34 +112,36 @@ startGame flags game =
 
 printBestMove :: Game -> IO ()
 printBestMove game =
+   case computeBestMove game of
+        Nothing -> do putStrLn "Invalid move.\nThere was a problem calculating the best move.\nExiting program."
+                      exitFailure
+        Just newGame -> do putStrLn $ prettyShow newGame
+                           putWinner newGame
+
+computeBestMove game =
    do bestM <- bestMove game
-      updatedGame <- makeMove game bestM
-      putStrLn $ prettyShow updatedGame
-      putWinner updatedGame
-{-
-      case updateGame of
-            Nothing -> putStrLn "Invalid move.\nThere was a problem calculating the best move.\nExiting program."
-                       exitFailure
-            Just newGame -> putStrLn $ prettyShow newGame
-                            putWinner newGame
--}
+      makeMove game bestM
 
 printMove :: Game -> Move -> IO ()
 printMove game move =
-   do updatedGame <- makeMove game move
-      putStrLn $ prettyShow updatedGame
-{-
-      case updateGame of
-           Nothing -> putStrLn "Invalid move.\nThere was a problem calculating the next move.\nExiting program."
+   case updatedGame of
+        Nothing -> do putStrLn "Invalid move.\nThere was a problem calculating the next move.\nExiting program."
                       exitFailure
-           Just newGame -> putStrLn $ prettyShow newGame
--}
+        Just newGame -> do putStrLn $ prettyShow newGame
+   where updatedGame = makeMove game move
 
 printGoodMove :: Game -> Int -> IO ()
 printGoodMove game depth =
+   case computeGoodMove game depth of
+        Nothing -> do putStrLn "Invalid move.\nThere was a problem calculating a move.\nExiting program."
+                      exitFailure
+        Just newGame -> do putStrLn $ prettyShow newGame
+
+computeGoodMove game depth =
    do goodM <- goodMove game depth
-      updatedGame <- makeMove game goodM
-      putStrLn $ prettyShow updatedGame
+      makeMove game goodM
+
+
 {-
       case updateGame of
            Nothing -> putStrLn "Invalid move.\nThere was a problem calculating a move.\nExiting program."
