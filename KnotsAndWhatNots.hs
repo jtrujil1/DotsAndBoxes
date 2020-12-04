@@ -6,6 +6,10 @@ import Data.Maybe
 import Debug.Trace
 import Text.Read (readMaybe)
 import Data.Char (toUpper)
+import System.Environment
+import System.IO
+import System.Console.GetOpt
+import System.Exit
 
 --Data Types--
 type Dot = (Int, Int)
@@ -18,6 +22,92 @@ data Outcome = Winner Player | Tie deriving (Show, Eq, Ord)
 data GameState = Ongoing | GameOver Outcome deriving (Show, Eq, Ord)
 type Game = (Int, [Line], PlayerScores, Player)
 
+data Flag = Help | Best | Depth String | Mv String deriving (Eq, Show)
+
+options :: [OptDescr Flag]
+options = [ Option ['h'] ["help"] (NoArg Help) "Print out a help message and quit the program."
+          , Option ['b'] ["best"] (NoArg Best) "Print out the best move, using an exhaustive search (no cut-off depth)."
+          , Option ['d'] ["depth"] (ReqArg (\str -> Depth str) "<num>") "Use <num> as a cutoff depth, instead of your default."
+          , Option ['m'] ["move", "mv", "mm"] (ReqArg (\str -> Mv str) "<move>") "Make <move> and print out the resulting board, in the input format, to stdout. The move should be 1-indexed. If a move requires multiple values, the move will be a tuple of numbers separated by a comma with no space."
+          ]
+
+main :: IO ()
+main =
+  do args <- getArgs
+     let (flags, inputs, errors) = getOpt Permute options args
+     putStrLn $ show (flags, inputs, errors)
+     --sequence $ map putStrLn args
+     let filename = case inputs of
+                        []      -> "game.txt"
+                        [fname] -> fname 
+                        _       -> error "Too many inputs!"
+     if Help `elem` flags
+       then putStrLn $ usageInfo "Usage: game [options] [file]" options
+       else do contents <- readFile filename
+               startGame flags (lines contents)
+
+getDepth :: [Flag] -> IO (Maybe Int)
+getDepth [] = return Nothing
+getDepth ((Depth d):fs) = readFlagInt d
+getDepth (_:fs) = getDepth fs
+
+getMv :: [Flag] -> IO (Maybe Move)
+getMv [] = return Nothing
+getMv ((Mv m):fs) =
+    case readMaybe m of
+    Nothing -> do putStrLn "Invalid move. Exiting program."
+                  exitFailure
+    Just x -> return $ Just x
+getMv (_:fs) = getMv fs
+
+readFlagInt str =
+  case readMaybe str of
+    Nothing -> do putStrLn "Invalid number. Exiting program."
+                  exitFailure
+    Just x -> return $ Just x
+
+startGame :: [Flag] -> [String] -> IO ()
+startGame flags fortunes =
+  do mDepth <- getDepth flags
+     mMove <- getMv flags
+     depth <- 
+        case mDepth of
+          Nothing -> getNumber "What depth do you want?"
+          Just d -> return d
+     x <-
+      case mMove of
+          Nothing -> getNumber "No Move Entered. Try Again."
+          Just c-> return c
+     putStrLn $ unlines $ getFortunes fortunes x count
+     if Quiet `elem` flags 
+     then return ()
+     else do again <- prompt "Do you want more fortunes?"
+             if map toLower again `elem` ["yes","y","sure","yup","why not?"]
+                then startGame flags fortunes
+                else return ()
+
+prompt :: String -> IO String
+prompt question =
+  do putStr $ question ++ ": "
+     hFlush stdout
+     getLine
+
+
+getLine :: String -> IO Move
+getLine line = 
+do answer <- prompt question
+     case readMaybe answer of
+        Just x -> return x
+        Nothing -> do putStrLn "You didn't give me a good number. I'm just going to use 6. Like you. You're a six."
+                      return 6
+
+getNumber :: String -> IO Int
+getNumber question =
+  do answer <- prompt question
+     case readMaybe answer of
+        Just x -> return x
+        Nothing -> do putStrLn "You didn't give me a good number. I'm just going to use 6. Like you. You're a six."
+                      return 6
 
 allDots size = [(x,y)| x <- [0..size-1], y <- [0..size-1]]
 
@@ -148,7 +238,7 @@ readGame :: String -> Maybe Game
 readGame str =
    case splitOn "\n" str of
       [sizeStr, boardStr, p1Str, p2Str, playerStr] ->
-         do let unStr str = sequence [readMaybe x | x <- splitOn "." str] 
+         do let unStr str = if str == "[]" then Just [] else sequence [readMaybe x | x <- splitOn "." str] 
             size <- readMaybe sizeStr
             board <- unStr boardStr 
             p1 <- unStr p1Str 
@@ -162,7 +252,7 @@ readGame str =
 
 showGame :: Game -> String
 showGame game@(size, board, (p1, p2), player) =
-   let str lst = intercalate "." $ map show lst
+   let str lst = if null lst then "[]" else intercalate "." $ map show lst
        p = case player of
                   Player1 -> "1"
                   Player2 -> "2"
@@ -189,17 +279,50 @@ putWinner game =
                  "T" -> putStrLn $ "It's a tie!!!"
                  otherwise -> putStrLn $ "And the winner is ... " ++ (map (toUpper) winnerStr) ++ "!!!"
 
-evaluation :: Game -> Int
-evaluation game@(size, board, (p1, p2), player) = 
+eval :: Game -> Int
+eval game@(size, board, (p1, p2), player) = 
    case checkBoard game of 
       GameOver Tie -> 0
-      GameOver Winner Player1 -> ((size-1)^2) + 1
-      GameOver Winner Player2 -> - $ ((size-1)^2) + 1
+      GameOver (Winner Player1) -> (size-1)^2 + 1
+      GameOver (Winner Player2) -> negate $ (size-1)^2 + 1
       Ongoing -> 
-          let scores@(score1, score2) = (length p1, length p2)
-          in case max scores of
-                  score1 -> score1
-                  score2 -> - score2
+          let (score1, score2) = (length p1, length p2)
+          in if score1 > score2 then score1 else negate score2
+
+--like bestMove but limited by the depth
+--not sure if we should be calling whoWillMaybeWin with (depth-1) or just depth haven't checked
+goodMove :: Game -> Int -> Maybe Move
+goodMove game@(size, board, (p1, p2), player) depth =
+  let vMoves = validMoves game
+      futurePlays = zip vMoves (catMaybes [makeMove game move | move <- vMoves])
+      evals = [(whoWillMaybeWin newGame (depth-1), move)| (move, newGame) <- futurePlays]
+  in if null vMoves then Nothing else Just (bestEval evals player)
+
+--chooses the best move depending on whose player's turn it is
+bestEval :: [(Int, Move)] -> Player-> Move
+bestEval lst player = 
+   case player of
+        Player1 -> snd $ maximum lst
+        Player2 -> snd $ minimum lst
+
+--like whoWillWin but limited by depth
+whoWillMaybeWin :: Game -> Int -> Int 
+whoWillMaybeWin game@(size, board, scores, player) depth = 
+  case checkBoard game of 
+      GameOver outcome -> eval game
+      Ongoing -> 
+        let vMoves = validMoves game
+            futurePlays = catMaybes [makeMove game move | move <- vMoves]
+            evals = [whoWillMaybeWin newGame (depth-1) | newGame <- futurePlays]
+        in if depth <= 0 then 0 else chooseEval evals player
+
+--chooses the best outcome depending on whose player's turn it is
+chooseEval :: [Int] -> Player -> Int
+chooseEval lst player =
+   case player of
+        Player1 -> maximum lst
+        Player2 -> minimum lst
+
 
 {-
 Player: Player1
