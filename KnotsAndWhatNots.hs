@@ -26,7 +26,7 @@ data Flag = Help | Best | Depth String | Mv String deriving (Eq, Show)
 
 options :: [OptDescr Flag]
 options = [ Option ['h'] ["help"] (NoArg Help) "Print out a help message and quit the program."
-          , Option ['b'] ["best"] (NoArg Best) "Print out the best move, using an exhaustive search (no cut-off depth)."
+          , Option ['w'] ["best", "winner"] (NoArg Best) "Print out the best move, using an exhaustive search (no cut-off depth)."
           , Option ['d'] ["depth"] (ReqArg (\str -> Depth str) "<num>") "Use <num> as a cutoff depth, instead of your default."
           , Option ['m'] ["move", "mv", "mm"] (ReqArg (\str -> Mv str) "<move>") "Make <move> and print out the resulting board, in the input format, to stdout. The move should be 1-indexed. If a move requires multiple values, the move will be a tuple of numbers separated by a comma with no space."
           ]
@@ -43,18 +43,20 @@ main =
                         _       -> error "Too many inputs!"
      if Help `elem` flags
        then putStrLn $ usageInfo "Usage: game [options] [file]" options
-       else do contents <- readFile filename
-               startGame flags (lines contents)
+       else do mGame <- loadGame filename 
+               case mGame of 
+                    Nothing -> putStrLn $ usageInfo "Invaid File \n Usage: game [options] [file]" options
+		    Just game -> startGame flags game
 
-getDepth :: [Flag] -> IO (Maybe Int)
-getDepth [] = return Nothing
+getDepth :: [Flag] -> IO Int
+getDepth [] = return 6
 getDepth ((Depth d):fs) = readFlagInt d
 getDepth (_:fs) = getDepth fs
 
 getMv :: [Flag] -> IO (Maybe Move)
 getMv [] = return Nothing
 getMv ((Mv m):fs) =
-    case readMaybe m of
+    case splitOn "," m of
     Nothing -> do putStrLn "Invalid move. Exiting program."
                   exitFailure
     Just x -> return $ Just x
@@ -64,26 +66,24 @@ readFlagInt str =
   case readMaybe str of
     Nothing -> do putStrLn "Invalid number. Exiting program."
                   exitFailure
-    Just x -> return $ Just x
+    Just x -> return x
 
-startGame :: [Flag] -> [String] -> IO ()
-startGame flags fortunes =
-  do mDepth <- getDepth flags
+startGame :: [Flag] -> Game -> IO ()
+startGame flags game =
+  do depth <- getDepth flags
      mMove <- getMv flags
-     depth <- 
-        case mDepth of
-          Nothing -> getNumber "What depth do you want?"
-          Just d -> return d
+     mWinner <- putStrLn $ putWinner
+     if Best `elem` flags of
      x <-
       case mMove of
-          Nothing -> getNumber "No Move Entered. Try Again."
+          Nothing -> return c --getLine "No Move Entered. Try Again."
           Just c-> return c
-     putStrLn $ unlines $ getFortunes fortunes x count
+     putStrLn $ unlines $ prettyShow game
      if Quiet `elem` flags 
      then return ()
      else do again <- prompt "Do you want more fortunes?"
              if map toLower again `elem` ["yes","y","sure","yup","why not?"]
-                then startGame flags fortunes
+                then startGame flags game
                 else return ()
 
 prompt :: String -> IO String
@@ -93,13 +93,15 @@ prompt question =
      getLine
 
 
-getLine :: String -> IO Move
-getLine line = 
+getMv :: String -> IO Move
+getMv line = 
 do answer <- prompt question
      case readMaybe answer of
         Just x -> return x
         Nothing -> do putStrLn "You didn't give me a good number. I'm just going to use 6. Like you. You're a six."
                       return 6
+getXY :: String -> Move
+getXY
 
 getNumber :: String -> IO Int
 getNumber question =
