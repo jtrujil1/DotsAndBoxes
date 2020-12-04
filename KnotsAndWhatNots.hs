@@ -6,6 +6,7 @@ import Data.Maybe
 import Debug.Trace
 import Text.Read (readMaybe)
 import Data.Char (toUpper)
+import Data.Char (toLower)
 import System.Environment
 import System.IO
 import System.Console.GetOpt
@@ -46,34 +47,50 @@ main =
        else do mGame <- loadGame filename 
                case mGame of 
                     Nothing -> putStrLn $ usageInfo "Invaid File \n Usage: game [options] [file]" options
-		    Just game -> startGame flags game
+                    Just game -> startGame flags game
 
 getDepth :: [Flag] -> IO Int
 getDepth [] = return 6
-getDepth ((Depth d):fs) = readFlagInt d
+getDepth ((Depth d):fs) =
+  case readMaybe d of
+       Nothing -> do putStrLn "You didn't give me a good number for depth. I'm just going to use 6. Like you. You're a six."
+                     return 6
+       Just x -> return x
 getDepth (_:fs) = getDepth fs
 
 getMv :: [Flag] -> IO (Maybe Move)
 getMv [] = return Nothing
 getMv ((Mv m):fs) =
-    case splitOn "," m of
-    Nothing -> do putStrLn "Invalid move. Exiting program."
-                  exitFailure
-    Just x -> return $ Just x
+    let strMove = splitOn "," m
+    in  case length strMove of
+             3 -> return $ readMove strMove
+             _ -> do putStrLn "Invalid move.\nA move should be in the format of: x,y,direction (direction is either h or v)\nExiting program."
+                     exitFailure
 getMv (_:fs) = getMv fs
 
-readFlagInt str =
-  case readMaybe str of
-    Nothing -> do putStrLn "Invalid number. Exiting program."
-                  exitFailure
-    Just x -> return x
+readMove [mx,my,md] =
+   let dir = case map toLower md of
+                "h" -> Just True
+                "v" -> Just False
+                _   -> Nothing
+   in  do x <- readMaybe mx
+          y <- readMaybe my
+          d <- dir
+          return ((x,y), d)
 
 startGame :: [Flag] -> Game -> IO ()
 startGame flags game =
   do depth <- getDepth flags
      mMove <- getMv flags
-     mWinner <- putStrLn $ putWinner
-     if Best `elem` flags of
+     if Best `elem` flags
+        then printBestMove game
+        else if (Mv _) `elem` flags
+                then case mMove of
+                          Nothing -> do putStrLn "Invalid move.\nA move should be in the format of: x,y,direction (direction is either h or v)\nExiting program."
+                                        exitFailure
+                          Just move -> printMove game move
+                else printGoodMove game depth
+{-
      x <-
       case mMove of
           Nothing -> return c --getLine "No Move Entered. Try Again."
@@ -85,7 +102,46 @@ startGame flags game =
              if map toLower again `elem` ["yes","y","sure","yup","why not?"]
                 then startGame flags game
                 else return ()
+-}
 
+printBestMove :: Game -> IO ()
+printBestMove game =
+   do bestM <- bestMove game
+      updatedGame <- makeMove game bestM
+      putStrLn $ prettyShow updatedGame
+      putWinner updatedGame
+{-
+      case updateGame of
+            Nothing -> putStrLn "Invalid move.\nThere was a problem calculating the best move.\nExiting program."
+                       exitFailure
+            Just newGame -> putStrLn $ prettyShow newGame
+                            putWinner newGame
+-}
+
+printMove :: Game -> Move -> IO ()
+printMove game move =
+   do updatedGame <- makeMove game move
+      putStrLn $ prettyShow updatedGame
+{-
+      case updateGame of
+           Nothing -> putStrLn "Invalid move.\nThere was a problem calculating the next move.\nExiting program."
+                      exitFailure
+           Just newGame -> putStrLn $ prettyShow newGame
+-}
+
+printGoodMove :: Game -> Int -> IO ()
+printGoodMove game depth =
+   do goodM <- goodMove game depth
+      updatedGame <- makeMove game goodM
+      putStrLn $ prettyShow updatedGame
+{-
+      case updateGame of
+           Nothing -> putStrLn "Invalid move.\nThere was a problem calculating a move.\nExiting program."
+                      exitFailure
+           Just newGame -> putStrLn $ prettyShow newGame
+-}
+
+{-
 prompt :: String -> IO String
 prompt question =
   do putStr $ question ++ ": "
@@ -110,6 +166,7 @@ getNumber question =
         Just x -> return x
         Nothing -> do putStrLn "You didn't give me a good number. I'm just going to use 6. Like you. You're a six."
                       return 6
+-}
 
 allDots size = [(x,y)| x <- [0..size-1], y <- [0..size-1]]
 
