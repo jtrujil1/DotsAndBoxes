@@ -36,7 +36,7 @@ main :: IO ()
 main =
   do args <- getArgs
      let (flags, inputs, errors) = getOpt Permute options args
-     putStrLn $ show (flags, inputs, errors)
+--     putStrLn $ --show (flags, inputs, errors)
      let filename = case inputs of
                         []      -> "game.txt"
                         [fname] -> fname 
@@ -127,7 +127,7 @@ printMove game move =
    case updatedGame of
         Nothing -> do putStrLn "Invalid move.\nThere was a problem calculating the next move.\nExiting program."
                       exitFailure
-        Just newGame -> do putStrLn $ prettyShow newGame
+        Just newGame -> do putStrLn $ showGame newGame
    where updatedGame = makeMove game move
 
 printGoodMove :: Game -> Int -> IO ()
@@ -139,7 +139,9 @@ printGoodMove game depth =
 
 computeGoodMove game depth =
    do goodM <- goodMove game depth
-      makeMove game goodM
+     makeMove game goodM
+--description of move 
+
 
 
 allDots size = [(x,y)| x <- [0..size-1], y <- [0..size-1]]
