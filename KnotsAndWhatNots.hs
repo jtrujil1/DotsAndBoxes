@@ -23,20 +23,21 @@ data Outcome = Winner Player | Tie deriving (Show, Eq, Ord)
 data GameState = Ongoing | GameOver Outcome deriving (Show, Eq, Ord)
 type Game = (Int, [Line], PlayerScores, Player)
 
-data Flag = Help | Best | Depth String | Mv String deriving (Eq, Show)
+data Flag = Help | Best | Depth String | Mv String | Verbose deriving (Eq, Show)
 
 options :: [OptDescr Flag]
 options = [ Option ['h'] ["help"] (NoArg Help) "Print out a help message and quit the program."
-          , Option ['w'] ["best", "winner"] (NoArg Best) "Print out the best move, using an exhaustive search (no cut-off depth)."
+          , Option ['w'] ["winner"] (NoArg Best) "Print out the best move, using an exhaustive search (no cut-off depth)."
           , Option ['d'] ["depth"] (ReqArg (\str -> Depth str) "<num>") "Use <num> as a cutoff depth, instead of your default."
-          , Option ['m'] ["move", "mv", "mm"] (ReqArg (\str -> Mv str) "<move>") "Make <move> and print out the resulting board, in the input format, to stdout. The move should be 1-indexed. If a move requires multiple values, the move will be a tuple of numbers separated by a comma with no space."
+          , Option ['v'] ["verbose"] (NoArg Verbose) "Output both the move and a description of how good it is: win, lose, tie, or a rating."
+          , Option ['m'] ["move"] (ReqArg (\str -> Mv str) "<move>") "Make <move> and print out the resulting board, in the input format, to stdout. The move should be 1-indexed. If a move requires multiple values, the move will be a tuple of numbers separated by a comma with no space."
           ]
 
 main :: IO ()
 main =
   do args <- getArgs
      let (flags, inputs, errors) = getOpt Permute options args
-     putStrLn $ show (flags, inputs, errors)
+     --putStrLn $ show (flags, inputs, errors)
      let filename = case inputs of
                         []      -> "game.txt"
                         [fname] -> fname 
@@ -46,7 +47,7 @@ main =
        else do mGame <- loadGame filename 
                case mGame of 
                     Nothing -> putStrLn $ usageInfo "Invaid File \n Usage: game [options] [file]" options
-                    Just game -> startGame flags game
+                    Just game -> startGame flags game filename
 
 getDepth :: [Flag] -> IO Int
 getDepth [] = return 6
@@ -77,18 +78,19 @@ readMove [mx,my,md] =
           d <- dir
           return ((x,y), d)
 
-startGame :: [Flag] -> Game -> IO ()
-startGame flags game =
-  do depth <- getDepth flags
-     mMove <- getMv flags
-     if Best `elem` flags
-        then printBestMove game
-        else if checkFlags flags
-                then case mMove of
-                          Nothing -> do putStrLn "Invalid move.\nA move should be in the format of: x,y,direction (direction is either h or v)\nExiting program."
-                                        exitFailure
-                          Just move -> printMove game move
-                else printGoodMove game depth
+startGame :: [Flag] -> Game -> String -> IO ()
+startGame flags game filename =
+   do depth <- getDepth flags
+      mMove <- getMv flags
+      if Best `elem` flags
+         then printBestMove game
+         else if checkFlags flags
+                 then case mMove of
+                           Nothing -> do putStrLn "Invalid move.\nA move should be in the format of: x,y,direction (direction is either h or v)\nExiting program."
+                                         exitFailure
+                           Just move -> printMove game move vFlag filename
+                 else printGoodMove game depth
+   where vFlag = Verbose `elem` flags
 
 
 checkFlags :: [Flag] -> Bool
@@ -96,50 +98,31 @@ checkFlags [] = False
 checkFlags ((Mv m):fs) = True
 checkFlags (_:fs) = checkFlags fs
 
-{-
-     x <-
-      case mMove of
-          Nothing -> return c --getLine "No Move Entered. Try Again."
-          Just c-> return c
-     putStrLn $ unlines $ prettyShow game
-     if Quiet `elem` flags 
-     then return ()
-     else do again <- prompt "Do you want more fortunes?"
-             if map toLower again `elem` ["yes","y","sure","yup","why not?"]
-                then startGame flags game
-                else return ()
--}
-
 printBestMove :: Game -> IO ()
 printBestMove game =
-   case computeBestMove game of
+   case bestMove game of
         Nothing -> do putStrLn "Invalid move.\nThere was a problem calculating the best move.\nExiting program."
                       exitFailure
-        Just newGame -> do putStrLn $ prettyShow newGame
-                           putWinner newGame
+        Just move -> do putStrLn $ "The best move is " ++ showMove move
 
-computeBestMove game =
-   do bestM <- bestMove game
-      makeMove game bestM
-
-printMove :: Game -> Move -> IO ()
-printMove game move =
+printMove :: Game -> Move -> Bool -> String -> IO ()
+printMove game move v filename =
    case updatedGame of
         Nothing -> do putStrLn "Invalid move.\nThere was a problem calculating the next move.\nExiting program."
                       exitFailure
-        Just newGame -> do putStrLn $ prettyShow newGame
+        Just newGame -> if v then do putStrLn $ prettyShow newGame
+                                     putWinner newGame
+                                     writeGame newGame filename
+                             else do putStrLn $ prettyShow newGame
+                                     writeGame newGame filename
    where updatedGame = makeMove game move
 
 printGoodMove :: Game -> Int -> IO ()
 printGoodMove game depth =
-   case computeGoodMove game depth of
+   case goodMove game depth of
         Nothing -> do putStrLn "Invalid move.\nThere was a problem calculating a move.\nExiting program."
                       exitFailure
-        Just newGame -> do putStrLn $ prettyShow newGame
-
-computeGoodMove game depth =
-   do goodM <- goodMove game depth
-      makeMove game goodM
+        Just move -> do putStrLn $ "A good move is " ++ showMove move
 
 
 allDots size = [(x,y)| x <- [0..size-1], y <- [0..size-1]]
@@ -210,8 +193,8 @@ prettyShow game@(size, board, (p1, p2), player) =
    let played = filter (\x -> x `notElem` board) (allLines size)
        boardStr = concat [rowStr num played game | num <- [0..size-1]]
        scoresStr = "Scores\nPlayer1: " ++ show (length p1) ++ "\tPlayer2: " ++ show (length p2) ++ "\n"
-       border = "===============\n"
-   in border ++ scoresStr ++ border ++ boardStr ++ border
+       border = "===========================\n"
+   in border ++ scoresStr ++ border ++ "\n" ++ boardStr ++ border
 
 rowStr num played (size, _, (p1, p2), _) =
     let hor = [((x, num), True) | x <- [0..size-2]] 
@@ -291,6 +274,10 @@ showGame game@(size, board, (p1, p2), player) =
                   Player2 -> "2"
    in intercalate "\n" [show size, str board, str p1, str p2, p]
 
+showMove :: Move -> String
+showMove ((x,y),dir) =
+   let dirStr = if dir then "hroizontal" else "vertical"
+   in "the " ++ dirStr ++ " line starting at (" ++ show x ++ "," ++ show y ++ ")."
 
 writeGame :: Game -> String -> IO ()
 writeGame game fileName = 
@@ -304,13 +291,18 @@ loadGame fp =
 
 putWinner :: Game -> IO ()
 putWinner game =
-   let winnerStr = case whoWillWin game of
-                     Winner Player1 -> "Player1"
-                     Winner Player2 -> "Player2"
-                     Tie -> "T"
-   in do case winnerStr of
-                 "T" -> putStrLn $ "It's a tie!!!"
-                 otherwise -> putStrLn $ "And the winner is ... " ++ (map (toUpper) winnerStr) ++ "!!!"
+   case checkBoard game of
+        GameOver outcome -> let winnerStr = case outcome of
+                                                  Winner Player1 -> "Player1"
+                                                  Winner Player2 -> "Player2"
+                                                  Tie -> "T"
+                             in do case winnerStr of
+                                        "T" -> do putStrLn $ "It's a tie!!!"
+                                        _ -> do putStrLn $ "And the winner is ... " ++ (map (toUpper) winnerStr) ++ "!!!"
+        Ongoing -> do putStrLn $ "Game still ongoing"
+                      let gameEval = eval game
+                          favor = if gameEval == 0 then "" else if gameEval < 0 then " (in favor of Player 2)" else " (in favor of Player 1)"
+                      putStrLn $ "Eval of current board: " ++ (show (abs (gameEval))) ++ favor
 
 eval :: Game -> Int
 eval game@(size, board, (p1, p2), player) = 
