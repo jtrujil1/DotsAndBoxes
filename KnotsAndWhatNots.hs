@@ -50,11 +50,11 @@ main =
                     Just game -> startGame flags game filename
 
 getDepth :: [Flag] -> IO Int
-getDepth [] = return 6
+getDepth [] = return 4
 getDepth ((Depth d):fs) =
   case readMaybe d of
-       Nothing -> do putStrLn "You didn't give me a good number for depth. I'm just going to use 6. Like you. You're a six."
-                     return 6
+       Nothing -> do putStrLn "You didn't give me a good number for depth. I'm just going to use 4. Like you. You're a four."
+                     return 4
        Just x -> return x
 getDepth (_:fs) = getDepth fs
 
